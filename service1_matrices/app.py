@@ -36,6 +36,15 @@ def multiply_matrices():
     except (ValueError, TypeError) as e:
         return jsonify({'erreur': str(e)}), 400
 
+@app.route('/matrices/transpose', methods=['POST'])
+def transpose_matrix():
+    data = request.get_json()
+    try:
+        A = parse_matrix(data, 'A')
+        result = A.T.tolist()
+        return jsonify({'operation': 'transposee', 'resultat': result})
+    except (ValueError, TypeError) as e:
+        return jsonify({'erreur': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
