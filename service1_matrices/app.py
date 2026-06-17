@@ -58,5 +58,20 @@ def determinant_matrix():
     except (ValueError, TypeError) as e:
         return jsonify({'erreur': str(e)}), 400
 
+@app.route('/matrices/inverse', methods=['POST'])
+def inverse_matrix():
+    data = request.get_json()
+    try:
+        A = parse_matrix(data, 'A')
+        if A.shape[0] != A.shape[1]:
+            return jsonify({'erreur': 'La matrice doit etre carree'}), 400
+        det = np.linalg.det(A)
+        if abs(det) < 1e-10:
+            return jsonify({'erreur': 'Matrice singuliere, non inversible'}), 400
+        result = np.linalg.inv(A).tolist()
+        return jsonify({'operation': 'inverse', 'resultat': result})
+    except (ValueError, TypeError) as e:
+        return jsonify({'erreur': str(e)}), 400
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
