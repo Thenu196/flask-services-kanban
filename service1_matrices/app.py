@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify
 import numpy as np
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 def parse_matrix(data, key):
     """Convertit une liste de listes en tableau NumPy."""
