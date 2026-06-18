@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Tests Service 1 - Calculs Matriciels</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 30px;
+    background: #f5f5f5;
+}
+
+h1 { color: #333; }
+
+h2 { color: #555; margin-top: 30px; }
+
+button {
+    padding: 12px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: white;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    vertical-align: top;
+}
+
+th { background: #222; color: white; }
+
+.success { background: #d4edda; }
+.fail    { background: #f8d7da; }
+
+pre { margin: 0; font-size: 13px; }
+
+#resume { margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Service 1 — Tests Matriciels</h1>
+<button onclick="runTests()">Lancer les tests</button>
+<h2 id="resume"></h2>
+
+<!-- ─── CAS NOMINAUX ─────────────────────────────────────────── -->
+<h2>Cas nominaux (résultat attendu)</h2>
+<table>
+  <thead>
+    <tr><th>Test</th><th>Statut</th><th>Réponse du serveur</th><th>Vérification</th></tr>
+  </thead>
+  <tbody id="results-ok"></tbody>
+</table>
+
+<!-- ─── CAS D'ERREUR ─────────────────────────────────────────── -->
+<h2>Cas d'erreur (le serveur doit refuser)</h2>
+<table>
+  <thead>
+    <tr><th>Test</th><th>Statut</th><th>Réponse du serveur</th><th>Vérification</th></tr>
+  </thead>
+  <tbody id="results-err"></tbody>
+</table>
+
+<script>
+
+const BASE_URL = "http://localhost:5001";
+
+// ─── Fonction utilitaire ──────────────────────────────────────
+
+async function executeTest(name, route, payload, expectedStatus, verify) {
+    try {
+        const response = await fetch(BASE_URL + route, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        // 1. Le code HTTP est-il correct ?
+        const statusOk = response.status === expectedStatus;
+
+        // 2. Le contenu est-il correct ? (si une fonction verify est fournie)
+        let verifyMsg = "—";
+        let verifyOk  = true;
+        if (verify) {
+            const result = verify(data);
+            verifyOk  = result.ok;
+            verifyMsg = result.msg;
+        }
+
+        const success = statusOk && verifyOk;
+
+        return { name, success, data, status: response.status, verifyMsg };
+
+    } catch (error) {
+        return { name, success: false, data: error.message, status: "ERREUR réseau", verifyMsg: "Requête bloquée (CORS ?)" };
+    }
+}
+
+function row(result) {
+    return `
+    <tr class="${result.success ? 'success' : 'fail'}">
+        <td>${result.name}</td>
+        <td>${result.success ? '✅ OK' : '❌ ECHEC'} (HTTP ${result.status})</td>
+        <td><pre>${JSON.stringify(result.data, null, 2)}</pre></td>
+        <td>${result.verifyMsg}</td>
+    </tr>`;
+}
+
+// ─── Tests ───────────────────────────────────────────────────
+
+async function runTests() {
+
+    // ── Cas nominaux : on vérifie le résultat ────────────────
+    const testsOk = [
+        {
+            name: "Addition 2×2",
+            route: "/matrices/add",
+            payload: { A: [[1,2],[3,4]], B: [[5,6],[7,8]] },
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+                const ok = r[0][0]===6 && r[0][1]===8 && r[1][0]===10 && r[1][1]===12;
+                return { ok, msg: ok ? "resultat = [[6,8],[10,12]] ✓" : `resultat inattendu : ${JSON.stringify(r)}` };
+            }
+        },
+        {
+            name: "Multiplication 2×2",
+            route: "/matrices/multiply",
+            payload: { A: [[1,2],[3,4]], B: [[5,6],[7,8]] },
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+                const ok = r[0][0]===19 && r[0][1]===22 && r[1][0]===43 && r[1][1]===50;
+                return { ok, msg: ok ? "resultat = [[19,22],[43,50]] ✓" : `resultat inattendu : ${JSON.stringify(r)}` };
+            }
+        },
+        {
+            name: "Transposition 2×3",
+            route: "/matrices/transpose",
+            payload: { A: [[1,2,3],[4,5,6]] },
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+                // Transposée de 2×3 doit être 3×2
+                const ok = r.length===3 && r[0].length===2
+                        && r[0][0]===1 && r[1][0]===2 && r[2][0]===3;
+                return { ok, msg: ok ? "resultat = [[1,4],[2,5],[3,6]] ✓" : `resultat inattendu : ${JSON.stringify(r)}` };
+            }
+        },
+        {
+            name: "Déterminant 2×2",
+            route: "/matrices/determinant",
+            payload: { A: [[1,2],[3,4]] },
+            expected: 200,
+            verify(data) {
+                const ok = Math.abs(data.resultat - (-2)) < 0.001;
+                return { ok, msg: ok ? `det = ${data.resultat} ≈ -2 ✓` : `det = ${data.resultat}, attendu -2` };
+            }
+        },
+        {
+            name: "Inverse 2×2",
+            route: "/matrices/inverse",
+            payload: { A: [[2,1],[5,3]] },
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+                const ok = Math.abs(r[0][0]-3) < 0.001 && Math.abs(r[0][1]-(-1)) < 0.001
+                        && Math.abs(r[1][0]-(-5)) < 0.001 && Math.abs(r[1][1]-2) < 0.001;
+                return { ok, msg: ok ? "resultat = [[3,-1],[-5,2]] ✓" : `resultat inattendu : ${JSON.stringify(r)}` };
+            }
+        }
+    ];
+
+    // ── Cas d'erreur : on vérifie que le serveur refuse ──────
+    const testsErr = [
+        {
+            name: "Addition — dimensions incompatibles",
+            route: "/matrices/add",
+            payload: { A: [[1,2]], B: [[1,2],[3,4]] },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Multiplication — dimensions incompatibles",
+            route: "/matrices/multiply",
+            payload: { A: [[1,2],[3,4]], B: [[1,2,3]] },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Déterminant — matrice non carrée",
+            route: "/matrices/determinant",
+            payload: { A: [[1,2,3],[4,5,6]] },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Inverse — matrice singulière (det=0)",
+            route: "/matrices/inverse",
+            payload: { A: [[1,2],[2,4]] },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Inverse — matrice non carrée",
+            route: "/matrices/inverse",
+            payload: { A: [[1,2,3],[4,5,6]] },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent" };
+            }
+        }
+    ];
+
+    // ── Exécution ─────────────────────────────────────────────
+
+    let htmlOk = "";
+    let htmlErr = "";
+    let totalOk = 0;
+    const total = testsOk.length + testsErr.length;
+
+    for (const t of testsOk) {
+        const result = await executeTest(t.name, t.route, t.payload, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlOk += row(result);
+    }
+
+    for (const t of testsErr) {
+        const result = await executeTest(t.name, t.route, t.payload, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlErr += row(result);
+    }
+
+    document.getElementById("results-ok").innerHTML  = htmlOk;
+    document.getElementById("results-err").innerHTML = htmlErr;
+    document.getElementById("resume").textContent    = `Résultat : ${totalOk}/${total} tests réussis`;
+}
+
+</script>
+</body>
+</html>
