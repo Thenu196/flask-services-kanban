@@ -1,0 +1,7 @@
+Réponses aux questions de vérification
+
+Q1 — 8 contrôles : présence fichier, nom, extension, taille ≤5Mo, lisibilité CSV, colonnes obligatoires, valeurs numériques, DataFrame non vide.
+Q2 — Les valeurs non numériques sont converties en NaN via pd.to_numeric(errors='coerce'), comptées, puis supprimées. Les lignes valides restantes sont insérées normalement.
+Q3 — Coordination via schema.sql versionné dans le dépôt Git : table donnees commune, index sur nom_serie pour les requêtes du Service 3, mêmes variables .env.
+Q4 — Réponse HTTP 400 : {"erreur": "Colonnes obligatoires manquantes", "manquantes": ["valeur"]}.
+Q5 — serie_C (6 points débit) : min=198.2, max=245.1, moyenne≈223.15, médiane≈224.45.
