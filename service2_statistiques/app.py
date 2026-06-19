@@ -111,6 +111,29 @@ def test_normalite():
     except (ValueError, TypeError) as e:
         return jsonify({'erreur': str(e)}), 400
         
+# Route supplémentaire - Test t de Student : POST /stats/test_student
+
+@app.route('/stats/test_student', methods=['POST'])
+def test_student():
+    data = request.get_json()
+
+    try:
+        groupe1 = validate_data(data, 'groupe1')
+        groupe2 = validate_data(data, 'groupe2')
+
+        t_stat, p_value = stats.ttest_ind(groupe1, groupe2)
+
+        return jsonify({
+            'operation': 'test_t_student',
+            'resultat': {
+                't_statistique':           round(float(t_stat), 4),
+                'p_value':                 round(float(p_value), 6),
+                'difference_significative': bool(p_value < 0.05)
+            }
+        })
+
+    except (ValueError, TypeError) as e:
+        return jsonify({'erreur': str(e)}), 400      
 if __name__ == '__main__':
     app.run(debug=True, port=5002)
 
