@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 import numpy as np
+from flask_cors import CORS
 from scipy import stats
 
 app = Flask(__name__)
+CORS(app)
 
 #Structure de base 
 def validate_data(data, key='data'):
@@ -45,6 +47,42 @@ def describe():
             'erreur': str(e)
         }), 400
 
+# Route 2 - Corrélation : POST /stats/correlation
+
+@app.route('/stats/correlation', methods=['POST'])
+def correlation():
+    data = request.get_json()
+
+    try:
+        x = validate_data(data, 'x')
+        y = validate_data(data, 'y')
+
+        if len(x) != len(y):
+            return jsonify({'erreur': 'x et y doivent avoir la même longueur'}), 400
+
+        r, p_value = stats.pearsonr(x, y)
+
+        interpretation = (
+            'forte' if abs(r) > 0.7
+            else 'modérée' if abs(r) > 0.4
+            else 'faible'
+        )
+
+        return jsonify({
+            'operation': 'correlation_pearson',
+            'resultat': {
+                'r':             round(float(r), 4),
+                'p_value':       round(float(p_value), 6),
+                'interpretation': interpretation,
+                'significatif':  bool(p_value < 0.05)
+            }
+        })
+
+    except (ValueError, TypeError) as e:
+        return jsonify({'erreur': str(e)}), 400
+            
 
 if __name__ == '__main__':
     app.run(debug=True, port=5002)
+
+    
