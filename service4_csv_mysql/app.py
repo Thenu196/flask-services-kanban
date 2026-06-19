@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS 
 import pandas as pd
 import mysql.connector
 from dotenv import load_dotenv
@@ -7,6 +8,7 @@ import io
 
 load_dotenv()
 app = Flask(__name__)
+CORS(app)       
 
 COLONNES_REQUISES = {'nom_serie', 'valeur'}
 COLONNES_VALIDES  = {'nom_serie', 'valeur', 'categorie', 'date_mesure'}
