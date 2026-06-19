@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test client — /stats/test_normalite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      padding: 2rem;
+    }
+
+    h1 { font-size: 1.2rem; font-weight: 500; margin-bottom: 1.5rem; }
+
+    .card {
+      background: #fff;
+      border: 0.5px solid #ddd;
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; }
+
+    textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 13px;
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+    }
+    textarea:focus { border-color: #888; }
+
+    input[type="text"] {
+      width: 100%;
+      font-family: monospace;
+      font-size: 13px;
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 0 0.75rem;
+      height: 36px;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: #888; }
+
+    button {
+      height: 36px;
+      padding: 0 1.1rem;
+      border: 0.5px solid #bbb;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #f0f0f0; }
+    button:active { transform: scale(0.98); }
+    button.primary { border-color: #555; font-weight: 500; }
+
+    .row { display: flex; gap: 10px; margin-top: 12px; }
+
+    .section-title { font-size: 13px; font-weight: 500; color: #444; margin-bottom: 10px; }
+
+    .preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .preset-row button { font-size: 12px; height: 28px; padding: 0 10px; color: #444; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge.ok   { background: #e8f5e9; color: #2e7d32; }
+    .badge.err  { background: #fdecea; color: #b71c1c; }
+    .badge.idle { background: #f0f0f0; color: #555; }
+
+    .status-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 0.75rem; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .stat-cell { background: #f9f9f9; border-radius: 7px; padding: 0.65rem 0.85rem; }
+    .stat-cell .key { font-size: 11px; color: #888; margin-bottom: 3px; }
+    .stat-cell .val { font-size: 16px; font-weight: 500; color: #111; }
+    .stat-cell .val.normale     { color: #1b5e20; }
+    .stat-cell .val.non-normale { color: #b71c1c; }
+
+    .verdict {
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .verdict.normale     { background: #e8f5e9; color: #1b5e20; }
+    .verdict.non-normale { background: #fdecea; color: #b71c1c; }
+
+    pre {
+      font-family: monospace;
+      font-size: 12px;
+      background: #f4f4f4;
+      border-radius: 6px;
+      padding: 0.75rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .curl-block {
+      font-family: monospace;
+      font-size: 12px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 7px;
+      padding: 0.75rem 1rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Test client — POST /stats/test_normalite</h1>
+
+<div class="card">
+  <p class="section-title">URL du serveur Flask</p>
+  <input type="text" id="base-url" value="http://127.0.0.1:5002" />
+
+  <p class="section-title" style="margin-top:1rem;">Données (JSON)</p>
+  <label>Tableau de valeurs numériques</label>
+  <textarea id="input-data">{"data": [2.1, 2.5, 2.3, 2.8, 2.4, 2.6, 2.2, 2.9, 2.7, 2.5]}</textarea>
+
+  <div class="preset-row">
+    <span style="font-size:12px; color:#888; align-self:center;">Exemples :</span>
+    <button onclick="setPreset('normale')">Distribution normale</button>
+    <button onclick="setPreset('non_normale')">Distribution non normale</button>
+    <button onclick="setPreset('uniforme')">Distribution uniforme</button>
+    <button onclick="setPreset('trop_courte')">Trop court (erreur)</button>
+    <button onclick="setPreset('cle_manquante')">Clé manquante (erreur)</button>
+  </div>
+
+  <div class="row">
+    <button class="primary" onclick="sendRequest()">Envoyer la requête ↗</button>
+    <button onclick="clearResult()">Effacer</button>
+  </div>
+</div>
+
+<div class="card" id="result-card" style="display:none;">
+  <div class="status-bar">
+    <span class="badge idle" id="status-badge">En attente</span>
+    <span id="status-text" style="color:#888; font-size:12px;"></span>
+  </div>
+
+  <div id="stats-display" style="display:none;">
+    <div class="verdict" id="verdict-box"></div>
+    <p class="section-title">Détails</p>
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+
+  <div id="raw-section" style="margin-top:1rem;">
+    <p class="section-title">Réponse brute</p>
+    <pre id="raw-output"></pre>
+  </div>
+</div>
+
+<div class="card">
+  <p class="section-title">Commande curl équivalente</p>
+  <div class="curl-block" id="curl-output"></div>
+</div>
+
+<script>
+const PRESETS = {
+  normale:      '{"data": [2.1, 2.5, 2.3, 2.8, 2.4, 2.6, 2.2, 2.9, 2.7, 2.5, 2.4, 2.6, 2.3, 2.5, 2.7]}',
+  non_normale:  '{"data": [1, 1, 1, 1, 2, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 9000]}',
+  uniforme:     '{"data": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]}',
+  trop_courte:  '{"data": [42]}',
+  cle_manquante:'{"valeurs": [1, 2, 3, 4, 5]}'
+};
+
+function setPreset(name) {
+  document.getElementById('input-data').value = PRESETS[name];
+  updateCurl();
+  clearResult();
+}
+
+function updateCurl() {
+  const url  = document.getElementById('base-url').value.trim();
+  const body = document.getElementById('input-data').value.trim();
+  document.getElementById('curl-output').textContent =
+    `curl -X POST ${url}/stats/test_normalite \\\n     -H 'Content-Type: application/json' \\\n     -d '${body}'`;
+}
+
+document.getElementById('input-data').addEventListener('input', updateCurl);
+document.getElementById('base-url').addEventListener('input', updateCurl);
+updateCurl();
+
+async function sendRequest() {
+  const url = document.getElementById('base-url').value.trim();
+  let payload;
+  try { payload = JSON.parse(document.getElementById('input-data').value.trim()); }
+  catch { showError('JSON invalide dans le champ de données.'); return; }
+
+  setBadge('idle', 'Envoi…');
+  document.getElementById('result-card').style.display = 'block';
+  document.getElementById('stats-display').style.display = 'none';
+  document.getElementById('raw-output').textContent = '';
+
+  try {
+    const t0  = performance.now();
+    const res = await fetch(`${url}/stats/test_normalite`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+    const ms   = Math.round(performance.now() - t0);
+    const data = await res.json();
+
+    document.getElementById('raw-output').textContent = JSON.stringify(data, null, 2);
+
+    if (res.ok && data.resultat) {
+      setBadge('ok', `${res.status} OK — ${ms} ms`);
+      renderStats(data.resultat);
+    } else {
+      setBadge('err', `${res.status} — ${data.erreur || 'Erreur inconnue'}`);
+    }
+  } catch (e) {
+    showError(`Impossible de joindre le serveur : ${e.message}`);
+  }
+}
+
+function renderStats(r) {
+  const isNormale = r.est_normale;
+
+  const verdict = document.getElementById('verdict-box');
+  verdict.className = `verdict ${isNormale ? 'normale' : 'non-normale'}`;
+  verdict.textContent = r.interpretation;
+
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = '';
+
+  const items = [
+    { key: 'statistique', label: 'Statistique W' },
+    { key: 'p_value',     label: 'p-value' },
+    { key: 'est_normale', label: 'Loi normale ?' }
+  ];
+
+  for (const { key, label } of items) {
+    if (r[key] === undefined) continue;
+    const cell = document.createElement('div');
+    cell.className = 'stat-cell';
+    let display = r[key];
+    let valClass = '';
+    if (key === 'est_normale') {
+      display   = r[key] ? 'Oui' : 'Non';
+      valClass  = r[key] ? 'normale' : 'non-normale';
+    }
+    cell.innerHTML = `<div class="key">${label}</div><div class="val ${valClass}">${display}</div>`;
+    grid.appendChild(cell);
+  }
+
+  document.getElementById('stats-display').style.display = 'block';
+}
+
+function setBadge(type, text) {
+  const b = document.getElementById('status-badge');
+  b.className = `badge ${type}`;
+  b.textContent = type === 'ok' ? '✓ Succès' : type === 'err' ? '✗ Erreur' : '…';
+  document.getElementById('status-text').textContent = text;
+}
+
+function showError(msg) {
+  document.getElementById('result-card').style.display = 'block';
+  document.getElementById('stats-display').style.display = 'none';
+  setBadge('err', msg);
+  document.getElementById('raw-output').textContent = msg;
+}
+
+function clearResult() {
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('stats-display').style.display = 'none';
+  document.getElementById('raw-output').textContent = '';
+}
+</script>
+</body>
+</html>

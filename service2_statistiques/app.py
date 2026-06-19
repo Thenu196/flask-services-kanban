@@ -81,7 +81,36 @@ def correlation():
     except (ValueError, TypeError) as e:
         return jsonify({'erreur': str(e)}), 400
             
+# Route 3 - Test de normalité : POST /stats/test_normalite
 
+@app.route('/stats/test_normalite', methods=['POST'])
+def test_normalite():
+    data = request.get_json()
+
+    try:
+        values = validate_data(data)
+
+        if len(values) > 5000:
+            return jsonify({'erreur': 'Shapiro-Wilk limité à 5000 valeurs'}), 400
+
+        stat, p_value = stats.shapiro(values)
+
+        return jsonify({
+            'operation': 'test_normalite_shapiro_wilk',
+            'resultat': {
+                'statistique':    round(float(stat), 6),
+                'p_value':        round(float(p_value), 6),
+                'est_normale':    bool(p_value > 0.05),
+                'interpretation': (
+                    'Distribution normale (p > 0.05)' if p_value > 0.05
+                    else 'Distribution non normale (p <= 0.05)'
+                )
+            }
+        })
+
+    except (ValueError, TypeError) as e:
+        return jsonify({'erreur': str(e)}), 400
+        
 if __name__ == '__main__':
     app.run(debug=True, port=5002)
 
