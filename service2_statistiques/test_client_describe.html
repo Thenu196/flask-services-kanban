@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test client — /stats/describe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      color: #111;
+    }
+
+    .card {
+      background: #fff;
+      border: 0.5px solid #ddd;
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 13px;
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+    }
+
+    textarea:focus { border-color: #888; }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      font-family: monospace;
+      font-size: 13px;
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 0 0.75rem;
+      height: 36px;
+      outline: none;
+    }
+
+    input[type="text"]:focus { border-color: #888; }
+
+    button {
+      height: 36px;
+      padding: 0 1.1rem;
+      border: 0.5px solid #bbb;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #f0f0f0; }
+    button:active { transform: scale(0.98); }
+    button.primary { border-color: #555; font-weight: 500; }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      margin-bottom: 0.75rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.ok   { background: #e8f5e9; color: #2e7d32; }
+    .badge.err  { background: #fdecea; color: #b71c1c; }
+    .badge.idle { background: #f0f0f0; color: #555; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .stat-cell {
+      background: #f9f9f9;
+      border-radius: 7px;
+      padding: 0.65rem 0.85rem;
+    }
+
+    .stat-cell .key {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 3px;
+    }
+
+    .stat-cell .val {
+      font-size: 18px;
+      font-weight: 500;
+      color: #111;
+    }
+
+    pre {
+      font-family: monospace;
+      font-size: 12px;
+      background: #f4f4f4;
+      border-radius: 6px;
+      padding: 0.75rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #222;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 10px;
+    }
+
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .preset-row button {
+      font-size: 12px;
+      height: 28px;
+      padding: 0 10px;
+      color: #444;
+    }
+
+    .curl-block {
+      font-family: monospace;
+      font-size: 12px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 7px;
+      padding: 0.75rem 1rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Test client — POST /stats/describe</h1>
+
+<div class="card">
+  <p class="section-title">URL du serveur Flask</p>
+  <div class="row">
+    <input type="text" id="base-url" value="http://localhost:5002" />
+  </div>
+
+  <p class="section-title" style="margin-top: 1rem;">Données (JSON)</p>
+  <label>Tableau de valeurs numériques</label>
+  <textarea id="input-data">{"data": [12.5, 15.3, 8.7, 21.0, 13.2, 9.8, 17.6, 11.4]}</textarea>
+
+  <div class="preset-row">
+    <span style="font-size:12px; color:#888; align-self:center;">Exemples :</span>
+    <button onclick="setPreset('normal')">Distribution normale</button>
+    <button onclick="setPreset('small')">Petite liste</button>
+    <button onclick="setPreset('invalid_short')">Trop court (erreur)</button>
+    <button onclick="setPreset('invalid_type')">Mauvais type (erreur)</button>
+    <button onclick="setPreset('missing_key')">Clé manquante (erreur)</button>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <button class="primary" onclick="sendRequest()">Envoyer la requête ↗</button>
+    <button onclick="clearResult()">Effacer</button>
+  </div>
+</div>
+
+<div class="card" id="result-card" class="hidden">
+  <div class="status-bar">
+    <span class="badge idle" id="status-badge">En attente</span>
+    <span id="status-text" style="color:#888; font-size:12px;"></span>
+  </div>
+
+  <div id="stats-display" class="hidden">
+    <p class="section-title">Résultats</p>
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+
+  <div id="raw-section" style="margin-top:1rem;">
+    <p class="section-title">Réponse brute</p>
+    <pre id="raw-output"></pre>
+  </div>
+</div>
+
+<div class="card">
+  <p class="section-title">Commande curl équivalente</p>
+  <div class="curl-block" id="curl-output">curl -X POST http://localhost:5002/stats/describe \
+     -H 'Content-Type: application/json' \
+     -d '{"data": [12.5, 15.3, 8.7, 21.0, 13.2, 9.8, 17.6, 11.4]}'</div>
+</div>
+
+<script>
+const LABELS = {
+  n: 'n', moyenne: 'Moyenne', mediane: 'Médiane',
+  ecart_type: 'Écart-type', variance: 'Variance',
+  minimum: 'Minimum', maximum: 'Maximum',
+  q1: 'Q1 (25%)', q3: 'Q3 (75%)', etendue: 'Étendue'
+};
+
+const PRESETS = {
+  normal:       '{"data": [12.5, 15.3, 8.7, 21.0, 13.2, 9.8, 17.6, 11.4]}',
+  small:        '{"data": [3, 7, 2]}',
+  invalid_short:'{"data": [42]}',
+  invalid_type: '{"data": ["hello", "world", 3]}',
+  missing_key:  '{"valeurs": [1, 2, 3, 4]}'
+};
+
+function setPreset(name) {
+  document.getElementById('input-data').value = PRESETS[name];
+  updateCurl();
+  clearResult();
+}
+
+function updateCurl() {
+  const url  = document.getElementById('base-url').value.trim();
+  const body = document.getElementById('input-data').value.trim();
+  document.getElementById('curl-output').textContent =
+    `curl -X POST ${url}/stats/describe \\\n     -H 'Content-Type: application/json' \\\n     -d '${body}'`;
+}
+
+document.getElementById('input-data').addEventListener('input', updateCurl);
+document.getElementById('base-url').addEventListener('input', updateCurl);
+
+async function sendRequest() {
+  const url  = document.getElementById('base-url').value.trim();
+  const raw  = document.getElementById('input-data').value.trim();
+
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    showError('JSON invalide dans le champ de données.');
+    return;
+  }
+
+  setBadge('idle', 'Envoi…');
+  document.getElementById('result-card').classList.remove('hidden');
+  document.getElementById('stats-display').classList.add('hidden');
+  document.getElementById('raw-output').textContent = '';
+
+  try {
+    const t0  = performance.now();
+    const res = await fetch(`${url}/stats/describe`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+    const ms   = Math.round(performance.now() - t0);
+    const data = await res.json();
+
+    document.getElementById('raw-output').textContent =
+      JSON.stringify(data, null, 2);
+
+    if (res.ok && data.resultat) {
+      setBadge('ok', `${res.status} OK — ${ms} ms`);
+      renderStats(data.resultat);
+    } else {
+      setBadge('err', `${res.status} — ${data.erreur || 'Erreur inconnue'}`);
+    }
+  } catch (e) {
+    showError(`Impossible de joindre le serveur : ${e.message}`);
+  }
+}
+
+function renderStats(r) {
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = '';
+  for (const [k, label] of Object.entries(LABELS)) {
+    if (r[k] === undefined) continue;
+    const cell = document.createElement('div');
+    cell.className = 'stat-cell';
+    cell.innerHTML = `<div class="key">${label}</div><div class="val">${r[k]}</div>`;
+    grid.appendChild(cell);
+  }
+  document.getElementById('stats-display').classList.remove('hidden');
+}
+
+function setBadge(type, text) {
+  const b = document.getElementById('status-badge');
+  b.className = `badge ${type}`;
+  b.textContent = type === 'ok' ? '✓ Succès' : type === 'err' ? '✗ Erreur' : '…';
+  document.getElementById('status-text').textContent = text;
+}
+
+function showError(msg) {
+  document.getElementById('result-card').classList.remove('hidden');
+  document.getElementById('stats-display').classList.add('hidden');
+  setBadge('err', msg);
+  document.getElementById('raw-output').textContent = msg;
+}
+
+function clearResult() {
+  document.getElementById('result-card').classList.add('hidden');
+  document.getElementById('stats-display').classList.add('hidden');
+  document.getElementById('raw-output').textContent = '';
+  setBadge('idle', '');
+}
+</script>
+
+</body>
+</html>

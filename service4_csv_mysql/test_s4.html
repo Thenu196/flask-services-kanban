@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Tests Service 4 - Chargement CSV vers MySQL</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 30px;
+    background: #f5f5f5;
+}
+
+h1 { color: #333; }
+
+h2 { color: #555; margin-top: 30px; }
+
+button {
+    padding: 12px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: white;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    vertical-align: top;
+}
+
+th { background: #222; color: white; }
+
+.success { background: #d4edda; }
+.fail    { background: #f8d7da; }
+
+pre { margin: 0; font-size: 13px; }
+
+#resume { margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Service 4 — Tests Chargement CSV vers MySQL</h1>
+<button onclick="runTests()">Lancer les tests</button>
+<h2 id="resume"></h2>
+
+<!-- ─── CAS NOMINAUX ─────────────────────────────────────────── -->
+<h2>Cas nominaux (résultat attendu)</h2>
+<table>
+  <thead>
+    <tr><th>Test</th><th>Statut</th><th>Réponse du serveur</th><th>Vérification</th></tr>
+  </thead>
+  <tbody id="results-ok"></tbody>
+</table>
+
+<!-- ─── CAS D'ERREUR ─────────────────────────────────────────── -->
+<h2>Cas d'erreur (le serveur doit refuser)</h2>
+<table>
+  <thead>
+    <tr><th>Test</th><th>Statut</th><th>Réponse du serveur</th><th>Vérification</th></tr>
+  </thead>
+  <tbody id="results-err"></tbody>
+</table>
+
+<script>
+
+const BASE_URL = "http://localhost:5004";
+
+// ─── CSV de test ─────────────────────────────────────────────
+
+const CSV_VALIDE = `nom_serie,valeur,categorie,date_mesure
+serie_A,12.50,temperature,2024-01-15
+serie_A,15.30,temperature,2024-01-16
+serie_B,45.10,pression,2024-01-15
+`;
+
+const CSV_DONNEES_EXEMPLE = `nom_serie,valeur,categorie,date_mesure
+serie_A,12.50,temperature,2024-01-15
+serie_A,15.30,temperature,2024-01-16
+serie_A,8.70,temperature,2024-01-17
+serie_A,21.00,temperature,2024-01-18
+serie_A,13.20,temperature,2024-01-19
+serie_A,9.80,temperature,2024-01-20
+serie_A,17.60,temperature,2024-01-21
+serie_A,11.40,temperature,2024-01-22
+serie_B,45.10,pression,2024-01-15
+serie_B,52.80,pression,2024-01-16
+serie_B,48.60,pression,2024-01-17
+serie_B,55.20,pression,2024-01-18
+serie_B,50.90,pression,2024-01-19
+serie_B,47.30,pression,2024-01-20
+serie_B,53.70,pression,2024-01-21
+serie_B,49.80,pression,2024-01-22
+serie_C,220.5,debit,2024-01-15
+serie_C,235.8,debit,2024-01-16
+serie_C,198.2,debit,2024-01-17
+serie_C,245.1,debit,2024-01-18
+serie_C,210.9,debit,2024-01-19
+serie_C,228.4,debit,2024-01-20
+`;
+
+const CSV_SANS_VALEUR = `nom_serie,categorie,date_mesure
+serie_X,temperature,2024-01-15
+`;
+
+const CSV_VALEURS_INVALIDES = `nom_serie,valeur,categorie,date_mesure
+serie_X,abc,temperature,2024-01-15
+serie_X,12.5,temperature,2024-01-16
+serie_X,,temperature,2024-01-17
+`;
+
+const CSV_COLONNES_MINIMALES = `nom_serie,valeur
+serie_Z,99.9
+serie_Z,88.8
+`;
+
+// ─── Fonction utilitaire ──────────────────────────────────────
+
+function csvFormData(contenu, nomFichier = "test.csv") {
+    const blob = new Blob([contenu], { type: "text/csv" });
+    const fd = new FormData();
+    fd.append("file", blob, nomFichier);
+    return fd;
+}
+
+async function executeTest(name, fetchFn, expectedStatus, verify) {
+    try {
+        const response = await fetchFn();
+        const data = await response.json();
+
+        const statusOk = response.status === expectedStatus;
+
+        let verifyMsg = "—";
+        let verifyOk  = true;
+        if (verify) {
+            const result = verify(data);
+            verifyOk  = result.ok;
+            verifyMsg = result.msg;
+        }
+
+        const success = statusOk && verifyOk;
+        return { name, success, data, status: response.status, verifyMsg };
+
+    } catch (error) {
+        return { name, success: false, data: error.message, status: "ERREUR réseau", verifyMsg: "Requête bloquée (CORS ?)" };
+    }
+}
+
+function row(result) {
+    return `
+    <tr class="${result.success ? 'success' : 'fail'}">
+        <td>${result.name}</td>
+        <td>${result.success ? '✅ OK' : '❌ ECHEC'} (HTTP ${result.status})</td>
+        <td><pre>${JSON.stringify(result.data, null, 2)}</pre></td>
+        <td>${result.verifyMsg}</td>
+    </tr>`;
+}
+
+// ─── Tests ───────────────────────────────────────────────────
+
+async function runTests() {
+
+    // ── Cas nominaux ─────────────────────────────────────────
+    const testsOk = [
+        {
+            name: "CSV valide → 201 + statut success",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(CSV_VALIDE) }),
+            expected: 201,
+            verify(data) {
+                const ok = data.statut === "success" && data.lignes_inserees > 0;
+                return { ok, msg: ok ? `statut=success, ${data.lignes_inserees} ligne(s) insérée(s) ✓` : `statut inattendu : ${JSON.stringify(data)}` };
+            }
+        },
+        {
+            name: "donnees_exemple.csv → 22 lignes insérées",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(CSV_DONNEES_EXEMPLE, "donnees_exemple.csv") }),
+            expected: 201,
+            verify(data) {
+                const ok = data.lignes_inserees === 22 && data.lignes_invalides_ignorees === 0;
+                return { ok, msg: ok ? "22 lignes insérées, 0 ignorées ✓" : `lignes_inserees=${data.lignes_inserees}, attendu 22` };
+            }
+        },
+        {
+            name: "Colonnes minimales (nom_serie + valeur)",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(CSV_COLONNES_MINIMALES) }),
+            expected: 201,
+            verify(data) {
+                const ok = data.lignes_inserees === 2;
+                return { ok, msg: ok ? "2 lignes insérées ✓" : `lignes_inserees=${data.lignes_inserees}, attendu 2` };
+            }
+        },
+        {
+            name: "Valeurs non numériques → 1 insérée, 2 ignorées",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(CSV_VALEURS_INVALIDES) }),
+            expected: 201,
+            verify(data) {
+                const ok = data.lignes_inserees === 1 && data.lignes_invalides_ignorees === 2;
+                return { ok, msg: ok ? "1 insérée, 2 ignorées ✓" : `inserees=${data.lignes_inserees}, ignorees=${data.lignes_invalides_ignorees}` };
+            }
+        },
+        {
+            name: "GET /upload/series → 200 + structure JSON",
+            fetchFn: () => fetch(BASE_URL + "/upload/series"),
+            expected: 200,
+            verify(data) {
+                const ok = Array.isArray(data.series) && typeof data.total === "number" && data.total === data.series.length;
+                return { ok, msg: ok ? `total=${data.total} série(s), cohérent ✓` : `structure inattendue : ${JSON.stringify(data)}` };
+            }
+        },
+        {
+            name: "GET /upload/series → structure de chaque élément",
+            fetchFn: () => fetch(BASE_URL + "/upload/series"),
+            expected: 200,
+            verify(data) {
+                if (!data.series || data.series.length === 0)
+                    return { ok: true, msg: "Aucune série en base (test ignoré) ✓" };
+                const s = data.series[0];
+                const ok = ["serie","n_points","debut","fin"].every(k => k in s);
+                return { ok, msg: ok ? "Clés serie, n_points, debut, fin présentes ✓" : `Clés manquantes dans ${JSON.stringify(s)}` };
+            }
+        },
+    ];
+
+    // ── Cas d'erreur ─────────────────────────────────────────
+    const testsErr = [
+        {
+            name: "Sans fichier → 400",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST" }),
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? "champ 'erreur' présent ✓" : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Fichier .txt (non CSV) → 400",
+            fetchFn: () => {
+                const fd = new FormData();
+                fd.append("file", new Blob(["ceci n'est pas un csv"], { type: "text/plain" }), "fichier.txt");
+                return fetch(BASE_URL + "/upload/csv", { method: "POST", body: fd });
+            },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur && data.erreur.toLowerCase().includes("csv");
+                return { ok, msg: ok ? `message d'erreur présent ✓` : "champ 'erreur' absent ou sans mention CSV" };
+            }
+        },
+        {
+            name: "Colonne 'valeur' manquante → 400",
+            fetchFn: () => fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(CSV_SANS_VALEUR) }),
+            expected: 400,
+            verify(data) {
+                const ok = Array.isArray(data.manquantes) && data.manquantes.includes("valeur");
+                return { ok, msg: ok ? "manquantes contient 'valeur' ✓" : `manquantes = ${JSON.stringify(data.manquantes)}` };
+            }
+        },
+        {
+            name: "Toutes valeurs non numériques → 400",
+            fetchFn: () => {
+                const csv = `nom_serie,valeur\nserie_X,abc\nserie_X,NaN_text\n`;
+                return fetch(BASE_URL + "/upload/csv", { method: "POST", body: csvFormData(csv) });
+            },
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? "champ 'erreur' présent ✓" : "champ 'erreur' absent" };
+            }
+        },
+        {
+            name: "Fichier > 5 Mo → 413",
+            fetchFn: () => {
+                let rows = "nom_serie,valeur\n";
+                for (let i = 0; i < 400000; i++) rows += `serie_A,${i}\n`;
+                const fd = new FormData();
+                fd.append("file", new Blob([rows], { type: "text/csv" }), "gros.csv");
+                return fetch(BASE_URL + "/upload/csv", { method: "POST", body: fd });
+            },
+            expected: 413,
+            verify(data) {
+                const ok = !!data.erreur;
+                return { ok, msg: ok ? "champ 'erreur' présent ✓" : "champ 'erreur' absent" };
+            }
+        },
+    ];
+
+    // ── Exécution ─────────────────────────────────────────────
+
+    let htmlOk = "";
+    let htmlErr = "";
+    let totalOk = 0;
+    const total = testsOk.length + testsErr.length;
+
+    for (const t of testsOk) {
+        const result = await executeTest(t.name, t.fetchFn, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlOk += row(result);
+    }
+
+    for (const t of testsErr) {
+        const result = await executeTest(t.name, t.fetchFn, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlErr += row(result);
+    }
+
+    document.getElementById("results-ok").innerHTML  = htmlOk;
+    document.getElementById("results-err").innerHTML = htmlErr;
+    document.getElementById("resume").textContent    = `Résultat : ${totalOk}/${total} tests réussis`;
+}
+
+</script>
+</body>
+</html>
