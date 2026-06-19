@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Tests Service 3 - Statistiques MySQL</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 30px;
+    background: #f5f5f5;
+}
+
+h1 { color: #333; }
+
+h2 { color: #555; margin-top: 30px; }
+
+button {
+    padding: 12px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background: white;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    vertical-align: top;
+}
+
+th { background: #222; color: white; }
+
+.success { background: #d4edda; }
+.fail    { background: #f8d7da; }
+
+pre { margin: 0; font-size: 13px; white-space: pre-wrap; }
+
+#resume { margin-top: 20px; }
+</style>
+</head>
+
+<body>
+
+<h1>Service 3 — Tests Statistiques MySQL</h1>
+
+<button onclick="runTests()">Lancer les tests</button>
+<h2 id="resume"></h2>
+
+<!-- ─── CAS NOMINAUX ─────────────────────────────────────────── -->
+<h2>Cas nominaux (résultat attendu)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Statut</th>
+      <th>Réponse du serveur</th>
+      <th>Vérification</th>
+    </tr>
+  </thead>
+  <tbody id="results-ok"></tbody>
+</table>
+
+<!-- ─── CAS D'ERREUR ─────────────────────────────────────────── -->
+<h2>Cas d'erreur (le serveur doit refuser)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Test</th>
+      <th>Statut</th>
+      <th>Réponse du serveur</th>
+      <th>Vérification</th>
+    </tr>
+  </thead>
+  <tbody id="results-err"></tbody>
+</table>
+
+<script>
+
+// Si tu ouvres la page via Flask :
+// http://127.0.0.1:5003/static/test_service3.html
+// tu peux laisser BASE_URL vide.
+const BASE_URL = "";
+
+// Si tu ouvres le fichier HTML directement depuis ton PC,
+// remplace par :
+// const BASE_URL = "http://127.0.0.1:5003";
+
+async function executeTest(name, route, expectedStatus, verify) {
+    try {
+        const response = await fetch(BASE_URL + route, {
+            method: "GET"
+        });
+
+        const data = await response.json();
+
+        const statusOk = response.status === expectedStatus;
+
+        let verifyMsg = "—";
+        let verifyOk  = true;
+
+        if (verify) {
+            const result = verify(data);
+            verifyOk  = result.ok;
+            verifyMsg = result.msg;
+        }
+
+        const success = statusOk && verifyOk;
+
+        return {
+            name,
+            success,
+            data,
+            status: response.status,
+            verifyMsg
+        };
+
+    } catch (error) {
+        return {
+            name,
+            success: false,
+            data: error.message,
+            status: "ERREUR réseau",
+            verifyMsg: "Requête bloquée ou serveur Flask non lancé"
+        };
+    }
+}
+
+function row(result) {
+    return `
+    <tr class="${result.success ? 'success' : 'fail'}">
+        <td>${result.name}</td>
+        <td>${result.success ? '✅ OK' : '❌ ECHEC'} (HTTP ${result.status})</td>
+        <td><pre>${JSON.stringify(result.data, null, 2)}</pre></td>
+        <td>${result.verifyMsg}</td>
+    </tr>`;
+}
+
+async function runTests() {
+
+    const testsOk = [
+        {
+            name: "Description statistique — serie_A",
+            route: "/db/stats/describe?serie=serie_A",
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+
+                const ok =
+                    data.source === "mysql" &&
+                    r &&
+                    r.serie === "serie_A" &&
+                    typeof r.n === "number" &&
+                    typeof r.moyenne === "number" &&
+                    typeof r.mediane === "number" &&
+                    typeof r.ecart_type === "number" &&
+                    typeof r.variance === "number" &&
+                    typeof r.minimum === "number" &&
+                    typeof r.maximum === "number";
+
+                return {
+                    ok,
+                    msg: ok
+                        ? "Statistiques présentes pour serie_A ✓"
+                        : "Champs statistiques manquants ou invalides"
+                };
+            }
+        },
+        {
+            name: "Corrélation Pearson — serie_A / serie_B",
+            route: "/db/stats/correlation?serie_x=serie_A&serie_y=serie_B",
+            expected: 200,
+            verify(data) {
+                const r = data.resultat;
+                const s = data.series;
+
+                const ok =
+                    data.source === "mysql" &&
+                    s &&
+                    s.x === "serie_A" &&
+                    s.y === "serie_B" &&
+                    typeof s.n_points === "number" &&
+                    r &&
+                    typeof r.r === "number" &&
+                    typeof r.p_value === "number" &&
+                    typeof r.significatif === "boolean";
+
+                return {
+                    ok,
+                    msg: ok
+                        ? `Corrélation calculée : r = ${r.r}, p_value = ${r.p_value} ✓`
+                        : "Champs de corrélation manquants ou invalides"
+                };
+            }
+        }
+    ];
+
+    const testsErr = [
+        {
+            name: "Description — paramètre serie manquant",
+            route: "/db/stats/describe",
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return {
+                    ok,
+                    msg: ok
+                        ? "Message d'erreur présent ✓"
+                        : "Champ 'erreur' absent"
+                };
+            }
+        },
+        {
+            name: "Description — série inexistante",
+            route: "/db/stats/describe?serie=serie_X",
+            expected: 404,
+            verify(data) {
+                const ok = !!data.erreur;
+                return {
+                    ok,
+                    msg: ok
+                        ? "Série inexistante refusée ✓"
+                        : "Champ 'erreur' absent"
+                };
+            }
+        },
+        {
+            name: "Corrélation — paramètres manquants",
+            route: "/db/stats/correlation",
+            expected: 400,
+            verify(data) {
+                const ok = !!data.erreur;
+                return {
+                    ok,
+                    msg: ok
+                        ? "Paramètres manquants refusés ✓"
+                        : "Champ 'erreur' absent"
+                };
+            }
+        },
+        {
+            name: "Corrélation — serie_y inexistante",
+            route: "/db/stats/correlation?serie_x=serie_A&serie_y=serie_X",
+            expected: 404,
+            verify(data) {
+                const ok = !!data.erreur;
+                return {
+                    ok,
+                    msg: ok
+                        ? "Série inexistante refusée ✓"
+                        : "Champ 'erreur' absent"
+                };
+            }
+        }
+    ];
+
+    let htmlOk = "";
+    let htmlErr = "";
+    let totalOk = 0;
+    const total = testsOk.length + testsErr.length;
+
+    for (const t of testsOk) {
+        const result = await executeTest(t.name, t.route, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlOk += row(result);
+    }
+
+    for (const t of testsErr) {
+        const result = await executeTest(t.name, t.route, t.expected, t.verify);
+        if (result.success) totalOk++;
+        htmlErr += row(result);
+    }
+
+    document.getElementById("results-ok").innerHTML  = htmlOk;
+    document.getElementById("results-err").innerHTML = htmlErr;
+    document.getElementById("resume").textContent    =
+        `Résultat : ${totalOk}/${total} tests réussis`;
+}
+
+</script>
+</body>
+</html>
