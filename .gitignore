@@ -6,15 +6,3 @@ __pycache__/
 **/__pycache__/
 *.pyc
 service5_python/lib/*.so
-
-# Fichiers Python compilés
-__pycache__/
-*.pyc
-*.pyo
-# Fichiers d'éditeur
-.vscode/
-.idea/
-*.swp
-# Fichiers système
-.DS_Store
-Thumbs.db
