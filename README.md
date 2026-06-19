@@ -3,18 +3,18 @@
 
 ---
 
-## 📋 Vue d'ensemble
+## Vue d'ensemble
 
 Ce projet implémente une **architecture de 5 microservices Flask** interconnectés, permettant :
-- ✅ Calcul de matrices et résolutions algébriques
-- 📊 Analyses statistiques sur des données
-- 📤 Chargement de fichiers CSV vers MySQL
-- 🔍 Requêtes statistiques depuis une base MySQL
-- 🔗 Conversion et intégration C/Python
+- Calcul de matrices et résolutions algébriques
+- Analyses statistiques sur des données
+- Chargement de fichiers CSV vers MySQL
+- Requêtes statistiques depuis une base MySQL
+- Conversion et intégration C/Python
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 flask-services-kanban/
@@ -40,7 +40,7 @@ service1/2 + service5 (traitement complémentaire)
 
 ---
 
-## 🚀 Installation rapide
+## Installation rapide
 
 ### Prérequis
 - Python 3.8+
@@ -67,7 +67,7 @@ cd service5_c_python && python app.py      # Port 5005
 
 ---
 
-## 📦 Services détaillés
+## Services détaillés
 
 ### Service 1 : Matrices (Port 5001)
 Calculs matriciels et résolutions algébriques.
@@ -115,7 +115,7 @@ curl http://localhost:5003/stats/series/serie_A
 
 ---
 
-### Service 4 : CSV → MySQL (Port 5004)
+### Service 4 : CSV vers MySQL (Port 5004)
 Chargement de fichiers CSV dans MySQL.
 
 **Endpoints principaux :**
@@ -150,7 +150,7 @@ curl -X POST http://localhost:5005/compute/native \
 
 ---
 
-## 🗄️ Base de données
+## Base de données
 
 ### Schéma MySQL
 
@@ -181,7 +181,7 @@ DB_NAME=flask_kanban
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ### Tests curl pour chaque service
 
@@ -217,7 +217,7 @@ cd service4_csv_mysql && chmod +x tests.sh && ./tests.sh
 
 ---
 
-## 📊 Flux d'utilisation typique
+## Flux d'utilisation typique
 
 1. **Service 4** : Charger un fichier CSV via `/upload/csv`
 2. **Service 3** : Consulter les données via `/stats/series`
@@ -227,7 +227,7 @@ cd service4_csv_mysql && chmod +x tests.sh && ./tests.sh
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 ### Variables d'environnement
 
@@ -245,12 +245,12 @@ cp service1_matrices/.env.example service1_matrices/.env
 | Service 1 | 5001 | Matrices |
 | Service 2 | 5002 | Statistiques (mémoire) |
 | Service 3 | 5003 | Statistiques (MySQL) |
-| Service 4 | 5004 | CSV → MySQL |
+| Service 4 | 5004 | CSV vers MySQL |
 | Service 5 | 5005 | Intégration C/Python |
 
 ---
 
-## 📝 Structure des données
+## Structure des données
 
 ### Exemple : Fichier CSV de démonstration
 
@@ -280,7 +280,7 @@ serie_C,220.5,debit,2024-01-15
 
 ---
 
-## 🛠️ Développement
+## Développement
 
 ### Structure type d'un service
 
@@ -306,7 +306,7 @@ python app.py
 
 ---
 
-## 🐛 Dépannage
+## Dépannage
 
 ### Service ne démarre pas
 ```bash
@@ -333,7 +333,7 @@ cat .env
 
 ---
 
-## 📚 Documentation additionnelle
+## Documentation additionnelle
 
 Chaque service possède son propre README détaillé :
 - [Service 1 - Matrices](./service1_matrices/README.md)
@@ -344,19 +344,19 @@ Chaque service possède son propre README détaillé :
 
 ---
 
-## 👥 Auteur
+## Auteur
 
 **Thenu196** — TP2 de R210_GPO
 
 ---
 
-## 📄 Licence
+## Licence
 
 À adapter selon les besoins du cours.
 
 ---
 
-## ✅ Checklist de déploiement
+## Checklist de déploiement
 
 - [ ] Base MySQL créée et accessible
 - [ ] Variables d'environnement configurées
